@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard Vĩ Mô Toàn Cầu - Gemini API</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script type="importmap">
+      {
+        "imports": {
+          "@google/genai": "https://esm.run/@google/genai"
+        }
+      }
+    </script>
+</head>
+<body class="bg-gray-50 text-gray-800 font-sans p-4 sm:p-6">
+    <div class="max-w-6xl mx-auto bg-white shadow-lg rounded-xl p-6">
+        
+        <!-- Header và Nút Bật/Tắt -->
+        <header class="flex flex-col sm:flex-row justify-between items-start sm:items-center border-b pb-4 mb-6 gap-4">
+            <div>
+                <h1 class="text-2xl font-bold text-blue-900">Dashboard Vĩ Mô Đa Quốc Gia</h1>
+                <p class="text-xs text-gray-500 mt-1">Cập nhật tự động qua Gemini API (Mỹ, EU, Trung Quốc, Nhật, Hàn, ASEAN...)</p>
+            </div>
+            
+            <div class="flex items-center space-x-3 bg-gray-50 p-3 rounded-lg border">
+                <span class="text-sm font-medium text-gray-700" id="status-label">Trạng thái: Tắt</span>
+                <label class="relative inline-flex items-center cursor-pointer">
+                    <input type="checkbox" id="update-toggle" class="sr-only peer" onchange="handleToggle(this)">
+                    <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+                </label>
+            </div>
+        </header>
+
+        <!-- Nhập API Key -->
+        <div class="mb-6 p-4 bg-yellow-50 border border-yellow-200 rounded-lg flex flex-col sm:flex-row items-center justify-between gap-3">
+            <div class="text-sm text-yellow-800">
+                <span class="font-semibold">Gemini API Key:</span> Dán khóa của bạn để hệ thống thực hiện nạp dữ liệu vĩ mô.
+            </div>
+            <input type="password" id="api-key-input" placeholder="Dán API Key vào đây..." class="border px-3 py-1.5 text-sm rounded w-full sm:w-72 focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white">
+        </div>
+
+        <!-- Thông báo trạng thái -->
+        <div id="alert-box" class="mb-6 p-4 rounded-lg bg-gray-100 text-gray-700 text-sm">
+            Hệ thống đang ở chế độ tĩnh. Hãy nhập API Key và gạt nút phía trên sang BẬT để hệ thống tự động tổng hợp dữ liệu các nước.
+        </div>
+
+        <!-- Chọn Quốc gia cần xem -->
+        <div class="mb-4 flex flex-wrap gap-2" id="country-tabs">
+            <button onclick="switchCountry('VN')" class="country-btn px-4 py-2 text-sm font-semibold rounded-lg bg-blue-600 text-white transition-all shadow-sm">Việt Nam</button>
+            <button onclick="switchCountry('US')" class="country-btn px-4 py-2 text-sm font-semibold rounded-lg bg-gray-200 text-gray-700 hover:bg-gray-300 transition-all">Mỹ (US)</button>
+            <button onclick="switchCountry('EU')" class="country-btn px-4 py-2 text-sm font-semibold rounded-lg bg-gray-200 text-gray-700 hover:bg-gray-300 transition-all">Khu vực Euro (EU)</button>
+            <button onclick="switchCountry('CN')" class="country-btn px-4 py-2 text-sm font-semibold rounded-lg bg-gray-200 text-gray-700 hover:bg-gray-300 transition-all">Trung Quốc</button>
+            <button onclick="switchCountry('JP')" class="country-btn px-4 py-2 text-sm font-semibold rounded-lg bg-gray-200 text-gray-700 hover:bg-gray-300 transition-all">Nhật Bản</button>
+            <button onclick="switchCountry('KR')" class="country-btn px-4 py-2 text-sm font-semibold rounded-lg bg-gray-200 text-gray-700 hover:bg-gray-300 transition-all">Hàn Quốc</button>
+            <button onclick="switchCountry('TH')" class="country-btn px-4 py-2 text-sm font-semibold rounded-lg bg-gray-200 text-gray-700 hover:bg-gray-300 transition-all">Thái Lan</button>
+            <button onclick="switchCountry('ID')" class="country-btn px-4 py-2 text-sm font-semibold rounded-lg bg-gray-200 text-gray-700 hover:bg-gray-300 transition-all">Indonesia</button>
+            <button onclick="switchCountry('MY')" class="country-btn px-4 py-2 text-sm font-semibold rounded-lg bg-gray-200 text-gray-700 hover:bg-gray-300 transition-all">Malaysia</button>
+        </div>
+
+        <!-- Bảng hiển thị chỉ số vĩ mô của quốc gia được chọn -->
+        <div class="overflow-x-auto border rounded-xl shadow-sm">
+            <table class="min-w-full divide-y divide-gray-200">
+                <thead class="bg-gray-100">
+                    <tr>
+                        <th class="px-6 py-3.5 text-left text-xs font-bold text-gray-600 uppercase tracking-wider">Chỉ số vĩ mô</th>
+                        <th class="px-6 py-3.5 text-left text-xs font-bold text-gray-600 uppercase tracking-wider">Kỳ báo cáo</th>
+                        <th class="px-6 py-3.5 text-left text-xs font-bold text-gray-600 uppercase tracking-wider">Giá trị / Tăng trưởng</th>
+                        <th class="px-6 py-3.5 text-left text-xs font-bold text-gray-600 uppercase tracking-wider">Phân tích chi tiết</th>
+                    </tr>
+                </thead>
+                <tbody class="bg-white divide-y divide-gray-200" id="data-table-body">
+                    <tr>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">CPI (Lạm phát YoY)</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500" data-field="cpi-period">-</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm font-semibold text-blue-600" data-field="cpi-val">Đang chờ...</td>
+                        <td class="px-6 py-4 text-sm text-gray-500" data-field="cpi-note">-</td>
+                    </tr>
+                    <tr>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">GDP Quý</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500" data-field="gdp-period">-</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm font-semibold text-blue-600" data-field="gdp-val">Đang chờ...</td>
+                        <td class="px-6 py-4 text-sm text-gray-500" data-field="gdp-note">-</td>
+                    </tr>
+                    <tr>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">PMI (Sản xuất)</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500" data-field="pmi-period">-</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm font-semibold text-blue-600" data-field="pmi-val">Đang chờ...</td>
+                        <td class="px-6 py-4 text-sm text-gray-500" data-field="pmi-note">-</td>
+                    </tr>
+                    <tr>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">IIP (Chỉ số sản xuất công nghiệp)</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500" data-field="iip-period">-</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm font-semibold text-blue-600" data-field="iip-val">Đang chờ...</td>
+                        <td class="px-6 py-4 text-sm text-gray-500" data-field="iip-note">-</td>
+                    </tr>
+                    <tr>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">Xuất nhập khẩu (Cán cân/Tăng trưởng)</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500" data-field="imex-period">-</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm font-semibold text-blue-600" data-field="imex-val">Đang chờ...</td>
+                        <td class="px-6 py-4 text-sm text-gray-500" data-field="imex-note">-</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Script xử lý -->
+    <script type="module">
+        import { GoogleGenAI } from "@google/genai";
+
+        let globalMacroData = {};
+        let currentCountry = 'VN';
+
+        const apiKeyInput = document.getElementById('api-key-input');
+        const savedKey = localStorage.getItem('gemini_api_key');
+        if (savedKey) apiKeyInput.value = savedKey;
+
+        apiKeyInput.addEventListener('input', (e) => {
+            localStorage.setItem('gemini_api_key', e.target.value.trim());
+        });
+
+        window.switchCountry = function(countryCode) {
+            currentCountry = countryCode;
+            document.querySelectorAll('.country-btn').forEach(btn => {
+                btn.className = "country-btn px-4 py-2 text-sm font-semibold rounded-lg bg-gray-200 text-gray-700 hover:bg-gray-300 transition-all";
+            });
+            event.target.className = "country-btn px-4 py-2 text-sm font-semibold rounded-lg bg-blue-600 text-white transition-all shadow-sm";
+            renderTable();
+        }
+
+        function renderTable() {
+            const data = globalMacroData[currentCountry];
+            if (!data) {
+                ['cpi', 'gdp', 'pmi', 'iip', 'imex'].forEach(field => {
+                    document.querySelector(`[data-field="${field}-period"]`).textContent = '-';
+                    document.querySelector(`[data-field="${field}-val"]`).textContent = 'Chưa có dữ liệu (Hãy bật nút cập nhật)';
+                    document.querySelector(`[data-field="${field}-note"]`).textContent = '-';
+                });
+                return;
+            }
+
+            document.querySelector('[data-field="cpi-period"]').textContent = data.cpi.period;
+            document.querySelector('[data-field="cpi-val"]').textContent = data.cpi.value;
+            document.querySelector('[data-field="cpi-note"]').textContent = data.cpi.note;
+
+            document.querySelector('[data-field="gdp-period"]').textContent = data.gdp.period;
+            document.querySelector('[data-field="gdp-val"]').textContent = data.gdp.value;
+            document.querySelector('[data-field="gdp-note"]').textContent = data.gdp.note;
+
+            document.querySelector('[data-field="pmi-period"]').textContent = data.pmi.period;
+            document.querySelector('[data-field="pmi-val"]').textContent = data.pmi.value;
+            document.querySelector('[data-field="pmi-note"]').textContent = data.pmi.note;
+
+            document.querySelector('[data-field="iip-period"]').textContent = data.iip.period;
+            document.querySelector('[data-field="iip-val"]').textContent = data.iip.value;
+            document.querySelector('[data-field="iip-note"]').textContent = data.iip.note;
+
+            document.querySelector('[data-field="imex-period"]').textContent = data.imex.period;
+            document.querySelector('[data-field="imex-val"]').textContent = data.imex.value;
+            document.querySelector('[data-field="imex-note"]').textContent = data.imex.note;
+        }
+
+        window.handleToggle = async function(checkbox) {
+            const statusLabel = document.getElementById('status-label');
+            const alertBox = document.getElementById('alert-box');
+            const apiKey = apiKeyInput.value.trim();
+
+            if (!apiKey) {
+                alert("Vui lòng nhập Gemini API Key trước khi bật công tắc!");
+                checkbox.checked = false;
+                return;
+            }
+
+            if (checkbox.checked) {
+                statusLabel.textContent = "Đang tổng hợp dữ liệu các nước...";
+                statusLabel.className = "text-sm font-medium text-blue-600 animate-pulse";
+                alertBox.className = "mb-6 p-4 rounded-lg bg-blue-50 text-blue-800 text-sm border border-blue-200";
+                alertBox.textContent = "AI đang xử lý dữ liệu vĩ mô mới nhất cho 9 quốc gia/khu vực (Việt Nam, Mỹ, EU, Trung Quốc, Nhật, Hàn, Thái Lan, Indo, Malaysia)...";
+
+                try {
+                    const ai = new GoogleGenAI({ apiKey: apiKey });
+
+                    const prompt = `Bạn là một chuyên gia phân tích kinh tế vĩ mô toàn cầu. Hãy cung cấp số liệu vĩ mô mới nhất tính đến thời điểm hiện tại cho 9 quốc gia và khu vực sau: Việt Nam (VN), Mỹ (US), Khu vực Euro/EU (EU), Trung Quốc (CN), Nhật Bản (JP), Hàn Quốc (KR), Thái Lan (TH), Indonesia (ID), Malaysia (MY).
+                    
+                    Các chỉ số cần lấy cho mỗi quốc gia gồm:
+                    1. CPI (Lạm phát YoY)
+                    2. GDP Quý gần nhất
+                    3. PMI (Chỉ số nhà quản trị mua hàng sản xuất)
+                    4. IIP (Chỉ số sản xuất công nghiệp YoY)
+                    5. Xuất nhập khẩu (Cán cân thương mại hoặc tăng trưởng kim ngạch)
+
+                    YÊU CẦU QUAN TRỌG: Hãy trả về kết quả DUY NHẤT dưới dạng cấu trúc JSON chuẩn (bao bọc trong json markdown block) với key là mã quốc gia tương ứng:
+                    {
+                      "VN": { "cpi": {...}, "gdp": {...}, "pmi": {...}, "iip": {...}, "imex": {...} },
+                      "US": { "cpi": {...}, "gdp": {...}, "pmi": {...}, "iip": {...}, "imex": {...} },
+                      "EU": { "cpi": {...}, "gdp": {...}, "pmi": {...}, "iip": {...}, "imex": {...} },
+                      "CN": { "cpi": {...}, "gdp": {...}, "pmi": {...}, "iip": {...}, "imex": {...} },
+                      "JP": { "cpi": {...}, "gdp": {...}, "pmi": {...}, "iip": {...}, "imex": {...} },
+                      "KR": { "cpi": {...}, "gdp": {...}, "pmi": {...}, "iip": {...}, "imex": {...} },
+                      "TH": { "cpi": {...}, "gdp": {...}, "pmi": {...}, "iip": {...}, "imex": {...} },
+                      "ID": { "cpi": {...}, "gdp": {...}, "pmi": {...}, "iip": {...}, "imex": {...} },
+                      "MY": { "cpi": {...}, "gdp": {...}, "pmi": {...}, "iip": {...}, "imex": {...} }
+                    }
+                    Trong đó mỗi chỉ số có dạng: { "period": "Tháng/Quý...", "value": "...", "note": "Nhận xét ngắn gọn" }`;
+
+                    const response = await ai.models.generateContent({
+                        model: 'gemini-2.5-flash',
+                        contents: prompt,
+                    });
+
+                    const textResponse = response.text();
+                    let jsonStr = textResponse;
+                    const jsonMatch = textResponse.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
+                    if (jsonMatch && jsonMatch[1]) {
+                        jsonStr = jsonMatch[1];
+                    }
+
+                    globalMacroData = JSON.parse(jsonStr.trim());
+                    renderTable();
+
+                    alertBox.className = "mb-6 p-4 rounded-lg bg-green-50 text-green-800 text-sm border border-green-200";
+                    alertBox.textContent = "Cập nhật thành công toàn bộ dữ liệu vĩ mô quốc tế! Bạn có thể bấm vào các nút quốc gia để xem chi tiết và gạt công tắc về TẮT.";
+                    statusLabel.textContent = "Đã cập nhật xong";
+                    statusLabel.className = "text-sm font-medium text-green-600";
+
+                } catch (error) {
+                    console.error(error);
+                    alertBox.className = "mb-6 p-4 rounded-lg bg-red-50 text-red-800 text-sm border border-red-200";
+                    alertBox.textContent = "Lỗi khi xử lý dữ liệu: " + error.message;
+                    statusLabel.textContent = "Lỗi kết nối";
+                    statusLabel.className = "text-sm font-medium text-red-600";
+                    checkbox.checked = false;
+                }
+
+            } else {
+                statusLabel.textContent = "Trạng thái: Tắt";
+                statusLabel.className = "text-sm font-medium text-gray-600";
+                alertBox.className = "mb-6 p-4 rounded-lg bg-gray-100 text-gray-700 text-sm";
+                alertBox.textContent = "Hệ thống đang ở chế độ tĩnh. Bật nút phía trên khi bạn muốn làm mới dữ liệu cho kỳ tiếp theo.";
+            }
+        }
+    </script>
+</body>
+</html>
